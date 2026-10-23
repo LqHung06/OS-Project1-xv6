@@ -92,20 +92,3 @@ make qemu
   $ procinfotest
   ```
 
----
-
-## 📦 Đóng gói Nộp bài (Trưởng nhóm thực hiện)
-
-Trước hạn nộp bài, đứng tại nhánh `main` và thực hiện:
-```bash
-# 1. Dọn dẹp file nhị phân tạm thời
-make clean
-
-# 2. Xuất file patch so với nhánh mốc syscall
-git diff origin/syscall...HEAD > 24120184_24120194_24120196_24120211.patch
-
-# 3. Kiểm tra danh sách file thay đổi
-git diff --stat origin/syscall...HEAD
-```
-Nén thư mục mã nguồn sạch `OS-Project1-xv6`, file `.patch` và file báo cáo `24120184_24120194_24120196_24120211_Report.pdf` thành file zip duy nhất:
-👉 **`24120184_24120194_24120196_24120211.zip`**
