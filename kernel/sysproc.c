@@ -100,3 +100,34 @@ sys_trace(void)
   myproc()->trace_mask = mask;
   return 0;
 }
+
+uint64
+sys_procinfo(void)
+{
+  int pid;
+  uint64 u_info;
+  struct procinfo pi;
+  struct proc *p;
+
+  if (argint(0, &pid) < 0)
+    return -1;
+
+  if (argaddr(1, &u_info) < 0)
+    return -1;
+
+  if (pid <= 0 || u_info == 0)
+    return -1;
+
+  memset(&pi, 0, sizeof(pi));
+
+  if (get_procinfo(pid, &pi) < 0)
+    return -1;
+
+  p = myproc();
+
+  if (copyout(p->pagetable, u_info,
+              (char *)&pi, sizeof(pi)) < 0)
+    return -1;
+
+  return 0;
+}
