@@ -109,11 +109,8 @@ sys_procinfo(void)
   struct procinfo pi;
   struct proc *p;
 
-  if (argint(0, &pid) < 0)
-    return -1;
-
-  if (argaddr(1, &u_info) < 0)
-    return -1;
+  argint(0, &pid);
+  argaddr(1, &u_info);
 
   if (pid <= 0 || u_info == 0)
     return -1;

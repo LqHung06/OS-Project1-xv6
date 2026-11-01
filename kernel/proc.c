@@ -98,8 +98,6 @@ get_procinfo(int pid, struct procinfo *pi)
   if (pid <= 0 || pi == 0)
     return -1;
 
-  // wait_lock phai duoc lay truoc p->lock.
-  // No bao ve truong parent cua process.
   acquire(&wait_lock);
 
   for (p = proc; p < &proc[NPROC]; p++) {
@@ -731,4 +729,3 @@ procdump(void)
     printf("\n");
   }
 }
-

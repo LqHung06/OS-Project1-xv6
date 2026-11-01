@@ -2,73 +2,130 @@
 #include "kernel/stat.h"
 #include "user/user.h"
 
-int
-main(void)
+static int passed = 0;
+static int failed = 0;
+
+void
+test_pid_le_zero(void)
+{
+  struct procinfo pi;
+  if (procinfo(0, &pi) == -1 && procinfo(-1, &pi) == -1 && procinfo(-999, &pi) == -1) {
+    printf("PASS: PID <= 0 rejected correctly\n");
+    passed++;
+  } else {
+    printf("FAIL: PID <= 0 accepted\n");
+    failed++;
+  }
+}
+
+void
+test_nonexistent_pid(void)
+{
+  struct procinfo pi;
+  if (procinfo(99999, &pi) == -1) {
+    printf("PASS: Nonexistent PID rejected correctly\n");
+    passed++;
+  } else {
+    printf("FAIL: Nonexistent PID accepted\n");
+    failed++;
+  }
+}
+
+void
+test_invalid_pointer(void)
+{
+  int pid = getpid();
+  if (procinfo(pid, 0) == -1 &&
+      procinfo(pid, (struct procinfo *)0xffffffffffffffff) == -1) {
+    printf("PASS: Invalid user-space pointers rejected correctly\n");
+    passed++;
+  } else {
+    printf("FAIL: Invalid pointer accepted\n");
+    failed++;
+  }
+}
+
+void
+test_valid_procinfo(void)
 {
   struct procinfo pi;
   int pid = getpid();
+  if (procinfo(pid, &pi) == 0 && pi.sz > 0 && pi.state == RUNNING) {
+    printf("PASS: Valid process information retrieved correctly\n");
+    passed++;
+  } else {
+    printf("FAIL: Failed to get valid process information\n");
+    failed++;
+  }
+}
 
-  printf("Testing procinfo syscall...\n");
+void
+test_pid_and_name(void)
+{
+  struct procinfo pi;
+  int pid = getpid();
+  if (procinfo(pid, &pi) == 0 && pi.pid == pid && strcmp(pi.name, "procinfotest") == 0) {
+    printf("PASS: Correct PID and process name verified\n");
+    passed++;
+  } else {
+    printf("FAIL: PID or process name mismatch\n");
+    failed++;
+  }
+}
 
-  // 1. Kiểm tra tiến trình hiện tại
-  if (procinfo(pid, &pi) < 0) {
-    printf("FAIL: Cannot get current process info\n");
-    exit(1);
-  }
-
-  if (pi.pid != pid) {
-    printf("FAIL: Incorrect PID\n");
-    exit(1);
-  }
-  if (strcmp(pi.name, "procinfotest") != 0) {
-    printf("FAIL: Incorrect process name\n");
-    exit(1);
-  }
-  if (pi.sz == 0) {
-    printf("FAIL: Invalid memory size\n");
-    exit(1);
-  }
-  if (pi.state != RUNNING) {
-    printf("FAIL: Incorrect process state\n");
-    exit(1);
-  }
-
-  // 2. Kiểm tra PID không hợp lệ (99999, 0, âm)
-  if (procinfo(99999, &pi) != -1 || procinfo(0, &pi) != -1 || procinfo(-1, &pi) != -1) {
-    printf("FAIL: Invalid PID accepted\n");
-    exit(1);
-  }
-  printf("PASS: Invalid PID rejected\n");
-
-  // 3. Kiểm tra con trỏ không hợp lệ (NULL và địa chỉ rác)
-  if (procinfo(pid, 0) != -1 || procinfo(pid, (struct procinfo *)0xffffffffffffffff) != -1) {
-    printf("FAIL: Bad pointers accepted\n");
-    exit(1);
-  }
-  printf("PASS: Bad pointers rejected\n");
-
-  // 4. Kiểm tra trường PPID bằng fork()
+void
+test_ppid(void)
+{
+  int ppid = getpid();
   int cpid = fork();
   if (cpid < 0) {
-    printf("FAIL: Fork failed\n");
-    exit(1);
+    printf("FAIL: Fork failed during PPID test\n");
+    failed++;
+    return;
   }
   if (cpid == 0) {
     struct procinfo cpi;
-    if (procinfo(getpid(), &cpi) < 0 || cpi.ppid != pid) {
-      printf("FAIL: Child PPID mismatch\n");
+    if (procinfo(getpid(), &cpi) == 0 && cpi.ppid == ppid && cpi.state == RUNNING) {
+      exit(0);
+    } else {
       exit(1);
     }
-    if (cpi.state != RUNNING) {
-      printf("FAIL: Child state mismatch\n");
-      exit(1);
+  } else {
+    int status = 0;
+    wait(&status);
+    if (status == 0) {
+      printf("PASS: Correct PPID verified via fork\n");
+      passed++;
+    } else {
+      printf("FAIL: PPID or child state mismatch\n");
+      failed++;
     }
+  }
+}
+
+int
+main(void)
+{
+  passed = 0;
+  failed = 0;
+
+  printf("Starting procinfotest...\n");
+
+  test_pid_le_zero();
+  test_nonexistent_pid();
+  test_invalid_pointer();
+  test_valid_procinfo();
+  test_pid_and_name();
+  test_ppid();
+
+  printf("=== Test Summary ===\n");
+  printf("Passed: %d, Failed: %d\n", passed, failed);
+
+  if (failed == 0) {
+    printf("All procinfo tests passed successfully!\n");
     exit(0);
   } else {
-    wait(0);
-    printf("PASS: PPID verified correctly\n");
+    printf("procinfotest FAILED with %d failure(s)!\n", failed);
+    exit(1);
   }
-
-  printf("All procinfo tests passed successfully!\n");
-  exit(0);
 }
