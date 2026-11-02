@@ -67,7 +67,7 @@ main(int argc, char *argv[])
             break;
           if(k >= MAXARG - 1){
             fprintf(2, "xargs: too many arguments\n");
-            break;
+            exit(1);
           }
           args[k++] = p;
           while(*p && *p != ' ' && *p != '\t')
@@ -80,7 +80,11 @@ main(int argc, char *argv[])
       len = 0;
       if(n == 0)
         break;
-    } else if(len < MAXLINE - 1){
+    } else {
+      if(len >= MAXLINE - 1){
+        fprintf(2, "xargs: line too long\n");
+        exit(1);
+      }
       line[len++] = c;
     }
   }
