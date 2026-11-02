@@ -1,5 +1,7 @@
 struct stat;
 
+#include "kernel/procinfo.h"
+
 // system calls
 int fork(void);
 int exit(int) __attribute__((noreturn));
@@ -23,6 +25,8 @@ char* sbrk(int);
 int sleep(int);
 int uptime(void);
 int trace(int);
+
+int procinfo(int, struct procinfo*);
 
 // ulib.c
 int stat(const char*, struct stat*);

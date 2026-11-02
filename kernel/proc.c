@@ -89,6 +89,40 @@ myproc(void)
   return p;
 }
 
+
+int
+get_procinfo(int pid, struct procinfo *pi)
+{
+  struct proc *p;
+
+  if (pid <= 0 || pi == 0)
+    return -1;
+
+  acquire(&wait_lock);
+
+  for (p = proc; p < &proc[NPROC]; p++) {
+    acquire(&p->lock);
+
+    if (p->pid == pid && p->state != UNUSED && p->state != USED) {
+      pi->pid = p->pid;
+      pi->ppid = p->parent ? p->parent->pid : 0;
+      pi->state = p->state;
+      pi->sz = p->sz;
+      safestrcpy(pi->name, p->name, sizeof(pi->name));
+
+      release(&p->lock);
+      release(&wait_lock);
+      return 0;
+    }
+
+    release(&p->lock);
+  }
+
+  release(&wait_lock);
+  return -1;
+}
+
+
 int
 allocpid()
 {
