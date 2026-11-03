@@ -5,6 +5,41 @@
 static int passed = 0;
 static int failed = 0;
 
+// Map a numeric procstate to its name, in user space only.
+// The kernel stores the state as an int (struct procinfo.state);
+// the đề's Usage Example prints it with %s, so the mapping lives here.
+static char*
+state_name(int state)
+{
+  switch(state){
+  case UNUSED:
+    return "UNUSED";
+  case USED:
+    return "USED";
+  case SLEEPING:
+    return "SLEEPING";
+  case RUNNABLE:
+    return "RUNNABLE";
+  case RUNNING:
+    return "RUNNING";
+  case ZOMBIE:
+    return "ZOMBIE";
+  default:
+    return "UNKNOWN";
+  }
+}
+
+// Print one procinfo record the way the đề's Usage Example does:
+// Process, PID/PPID, State (as a name), Memory.
+static void
+print_procinfo(struct procinfo *pi)
+{
+  printf("Process: %s\n", pi->name);
+  printf("PID: %d, PPID: %d\n", pi->pid, pi->ppid);
+  printf("State: %s\n", state_name(pi->state));
+  printf("Memory: %ld bytes\n", pi->sz);
+}
+
 void
 test_pid_le_zero(void)
 {
@@ -51,6 +86,7 @@ test_valid_procinfo(void)
   struct procinfo pi;
   int pid = getpid();
   if (procinfo(pid, &pi) == 0 && pi.sz > 0 && pi.state == RUNNING) {
+    print_procinfo(&pi);
     printf("PASS: Valid process information retrieved correctly\n");
     passed++;
   } else {
@@ -103,6 +139,85 @@ test_ppid(void)
   }
 }
 
+void
+test_query_child(void)
+{
+  struct procinfo pi;
+  int cpid = fork();
+  if (cpid < 0) {
+    printf("FAIL: Fork failed during child query test\n");
+    failed++;
+    return;
+  }
+  if (cpid == 0) {
+    sleep(30);
+    exit(0);
+  }
+  // Parent asks about the living child: it must be found, with the
+  // parent as its PPID, in a live state (sleeping, runnable, running).
+  if (procinfo(cpid, &pi) == 0 && pi.pid == cpid &&
+      pi.ppid == getpid() &&
+      (pi.state == SLEEPING || pi.state == RUNNABLE ||
+       pi.state == RUNNING)) {
+    print_procinfo(&pi);
+    printf("PASS: Parent queried child process correctly\n");
+    passed++;
+  } else {
+    printf("FAIL: Parent could not query child process\n");
+    failed++;
+  }
+  wait(0);
+}
+
+void
+test_init_ppid(void)
+{
+  struct procinfo pi;
+  // init (PID 1) has no parent, so its PPID must be 0.
+  if (procinfo(1, &pi) == 0 && pi.pid == 1 && pi.ppid == 0) {
+    print_procinfo(&pi);
+    printf("PASS: init (PID 1) has PPID 0\n");
+    passed++;
+  } else {
+    printf("FAIL: init PPID is not 0\n");
+    failed++;
+  }
+}
+
+void
+test_zombie(void)
+{
+  struct procinfo pi;
+  int cpid = fork();
+  if (cpid < 0) {
+    printf("FAIL: Fork failed during zombie test\n");
+    failed++;
+    return;
+  }
+  if (cpid == 0) {
+    exit(0);
+  }
+  // Poll until the child has exited but has not been reaped yet.
+  // A ZOMBIE child stays in the table until the parent calls wait().
+  int seen_zombie = 0;
+  for (int i = 0; i < 50; i++) {
+    if (procinfo(cpid, &pi) == 0 && pi.state == ZOMBIE) {
+      seen_zombie = 1;
+      break;
+    }
+    sleep(1);
+  }
+  if (seen_zombie) {
+    print_procinfo(&pi);
+    printf("PASS: Exited child is ZOMBIE until reaped\n");
+    passed++;
+  } else {
+    printf("FAIL: Exited child was not observed as ZOMBIE\n");
+    failed++;
+  }
+  wait(0);
+}
+
 int
 main(void)
 {
@@ -117,6 +232,9 @@ main(void)
   test_valid_procinfo();
   test_pid_and_name();
   test_ppid();
+  test_query_child();
+  test_init_ppid();
+  test_zombie();
 
   printf("=== Test Summary ===\n");
   printf("Passed: %d, Failed: %d\n", passed, failed);
